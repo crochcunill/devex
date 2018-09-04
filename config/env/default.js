@@ -8,7 +8,7 @@ module.exports = {
 		description: 'Better ways for government and developers to work together',
 		keywords: 'developer, government, codewithus, agile, digitial service',
 		googleAnalyticsTrackingID: process.env.GOOGLE_ANALYTICS_TRACKING_ID || 'GOOGLE_ANALYTICS_TRACKING_ID',
-		domain: process.env.DOMAIN || 'http://localhost:3030'
+		domain: process.env.DOMAIN || 'http://localhost:3000'
 	},
 	devexProd: process.env.DEVEX_PROD || false,
 	port: process.env.PORT || 3000,
@@ -28,6 +28,8 @@ module.exports = {
 		// in HTTPS mode.
 		secure: false
 	},
+	sessionTimeout: process.env.SESSION_TIMEOUT || 300,
+	sessionTimeoutWarning: process.env.SESSION_WARNING || 300,
 	home: process.env.PWD || '/opt/mean.js',
 	terms: {
 		'cwu1': {
@@ -56,12 +58,12 @@ module.exports = {
 			type: 'application/pdf'
 		},
 		'codechallenge': {
-			path: 'public/code-challenge-rules-2018-05-14.pdf',
+			path: 'public/code-challenge-rules-2018-08-10.pdf',
 			name: 'code-challenge.pdf',
 			type: 'application/pdf'
 		},
 		'teamscenario': {
-			path: 'public/team-scenario-rules-2018-05-25.pdf',
+			path: 'public/team-scenario-rules-2018-08-10.pdf',
 			name: 'team-scenario.pdf',
 			type: 'application/pdf'
 		}

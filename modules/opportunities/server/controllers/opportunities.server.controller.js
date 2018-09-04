@@ -25,7 +25,6 @@ var path = require('path'),
 	errorHandler = require(path.resolve('./modules/core/server/controllers/errors.server.controller')),
 	helpers = require(path.resolve('./modules/core/server/controllers/core.server.helpers')),
 	_ = require('lodash'),
-	Notifications = require(path.resolve('./modules/notifications/server/controllers/notifications.server.controller')),
 	sendMessages = require(path.resolve('./modules/messages/server/controllers/messages.controller')).sendMessages,
 	Proposals = require(path.resolve('./modules/proposals/server/controllers/proposals.server.controller')),
 	github = require(path.resolve('./modules/core/server/controllers/core.server.github'))
@@ -182,7 +181,7 @@ var setNotificationData = function (opportunity) {
 var setMessageData = function (opportunity) {
 	opportunity.path                 = '/opportunities/'+(opportunity.opportunityTypeCd === 'sprint-with-us' ? 'swu' : 'cwu')+'/'+opportunity.code;
 	opportunity.earn_format_mnoney   = helpers.formatMoney ((opportunity.opportunityTypeCd === 'sprint-with-us' ? opportunity.phases.aggregate.target : opportunity.earn), 2);
-	opportunity.earn                 = helpers.formatMoney ((opportunity.opportunityTypeCd === 'sprint-with-us' ? opportunity.phases.aggregate.target : opportunity.earn), 2);
+	opportunity.earn                 = opportunity.opportunityTypeCd === 'sprint-with-us' ? opportunity.phases.aggregate.target : opportunity.earn;
 	opportunity.dateDeadline         = helpers.formatDate (new Date(opportunity.deadline));
 	opportunity.timeDeadline         = helpers.formatTime (new Date(opportunity.deadline));
 	opportunity.dateAssignment       = helpers.formatDate (new Date(opportunity.assignment));
@@ -272,9 +271,8 @@ var oppBody = function (opp) {
 	// ret += '<h2>Proposal Evaluation Criteria</h2>';
 	// ret += opp.evaluation;
 
-	ret += '<p>This is a paid opportunity through the <a href="https://bcdevexchange.org">BCDevExchange</a>.</p>';
-	ret += '<br/>';
-	ret += '<p>To apply, visit the <a href="https://bcdevexchange.org/opportunities/'+opptype+'/'+opp.code+'">opportunity page</a> and submit a proposal before '+deadline+'</p>';
+	ret += '<p>This issue has been auto-generated to facilitate questions about <a href="https://bcdevexchange.org/opportunities/'+opptype+'/'+opp.code+'">a paid opportunity</a> that has just been posted on the <a href="https://bcdevexchange.org">BCDevExchange</a>.</p>';
+	ret += '<p>To learn more or apply, <a href="https://bcdevexchange.org/opportunities/'+opptype+'/'+opp.code+'">visit the opportunity page</a>. The opportunity closes on <b>'+deadline+'</b>.</p>';
 	return ret;
 
 };
@@ -299,30 +297,10 @@ var setPhases = function (opportunity) {
 	var capabilities = imp.capabilities.concat (inp.capabilities, prp.capabilities);
 	var capabilitiesCore = imp.capabilitiesCore.concat (inp.capabilitiesCore, prp.capabilitiesCore);
 	var capabilitySkills = imp.capabilitySkills.concat (inp.capabilitySkills, prp.capabilitySkills);
-	var capabilityIds = capabilities.map (function (el) {
-		return (el._id) ? el._id : el;
-	})
-	.reduce (function (accum, curr) {
-		accum[curr] = 1;
-		return accum;
-	}, {});
-	var capabilityCoreIds = capabilitiesCore.map (function (el) {
-		return (el._id) ? el._id : el;
-	})
-	.reduce (function (accum, curr) {
-		accum[curr] = 1;
-		return accum;
-	}, {});
-	var capabilitySkillIds = capabilitySkills.map (function (el) {
-		return (el._id) ? el._id : el;
-	})
-	.reduce (function (accum, curr) {
-		accum[curr] = 1;
-		return accum;
-	}, {});
-	agg.capabilities = Object.keys (capabilityIds);
-	agg.capabilitiesCore = Object.keys (capabilityCoreIds);
-	agg.capabilitySkills = Object.keys (capabilitySkillIds);
+
+	agg.capabilities = capabilities;
+	agg.capabilitiesCore = capabilitiesCore;
+	agg.capabilitySkills = capabilitySkills;
 	//
 	// total up the targets
 	//
@@ -394,9 +372,13 @@ exports.read = function (req, res) {
 
 var updateSave = function (opportunity) {
 	return new Promise (function (resolve, reject) {
-		opportunity.save (function (err) {
-			if (err) reject (err);
-			else resolve (opportunity);
+		opportunity.save (function (err, updatedOpportunity) {
+			if (err) {
+				reject (err);
+			}
+			else {
+				resolve (updatedOpportunity);
+			}
 		});
 	});
 };
@@ -419,7 +401,17 @@ exports.update = function (req, res) {
 	// copy over everything passed in. This will overwrite the
 	// audit fields, but they get updated in the following step
 	//
-	var opportunity = _.assign (req.opportunity, req.body);
+	// We use lodash mergeWith and a customizer to handle arrays.  By default lodash merge will concatenate arrays, which means that
+	// items can never be removed.  The customizer defaults to also use the incoming array.
+	// see https://lodash.com/docs/4.17.10#mergeWith
+	var opportunity = _.mergeWith(req.opportunity, req.body, (objValue, srcValue) => {
+		if (_.isArray(objValue)) {
+			return srcValue;
+		}
+	});
+
+	// manually transfer over skills, as the merge won't handle removals properly from the skills array
+	// opportunity.skills = req.body.skills;
 	//
 	// set the audit fields so we know who did what when
 	//
@@ -433,7 +425,8 @@ exports.update = function (req, res) {
 	//
 	updateSave (opportunity)
 	.then (function () {
-		if (opportunity.isPublished) {
+		// BA-694: only send out notifications on published opportunities that are still open
+		if (opportunity.isPublished && opportunity.deadline - new Date() > 0) {
 			sendMessages ('opportunity-update', opportunity.watchers, {opportunity: setMessageData (opportunity)});
 			github.createOrUpdateIssue ({
 				title  : opportunity.name,
@@ -444,8 +437,11 @@ exports.update = function (req, res) {
 			.then (function (result) {
 				opportunity.issueUrl    = result.html_url;
 				opportunity.issueNumber = result.number;
-				opportunity.save ();
-				res.json (decorate (opportunity, req.user ? req.user.roles : []));
+				updateSave (opportunity)
+				.then(function(updatedOpportunity) {
+					opportunity = updatedOpportunity;
+					res.json (decorate (opportunity, req.user ? req.user.roles : []));
+				})
 			})
 			.catch (function () {
 				res.status(422).send({
@@ -510,7 +506,8 @@ var pub = function (req, res, isToBePublished) {
 		var data = setNotificationData (opportunity);
 		if (firstTime) {
 			getSubscribedUsers ().then (function (users) {
-				sendMessages ('opportunity-add', users, {opportunity: setMessageData (opportunity)});
+				var messageCode = (opportunity.opportunityTypeCd === 'code-with-us') ? 'opportunity-add-cwu' : 'opportunity-add-swu';
+				sendMessages (messageCode, users, {opportunity: setMessageData (opportunity)});
 			});
 		}
 		else if (isToBePublished) {
@@ -940,11 +937,18 @@ exports.opportunityByID = function (req, res, next, id) {
 		.populate({
 			path: 'proposal',
 			model: 'Proposal',
-			populate : {
-				path: 'user',
-				model: 'User'
-			}
+			populate : [
+				{
+					path: 'user',
+					model: 'User'
+				},
+				{
+					path: 'org',
+					model: 'Org'
+				}
+				]
 		})
+		.populate('addenda.createdBy', 'displayName')
 		// .populate({path:'proposal.user', model:'User'}) //'displayName firstName lastName email phone address username profileImageURL businessName businessAddress businessContactName businessContactPhone businessContactEmail')
 		.exec(function (err, opportunity) {
 			if (err) {

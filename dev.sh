@@ -7,7 +7,11 @@ fi
 echo "Current working directory is " $pwdPath
 docker stop db_devex
 docker start db_devex
-docker stop mean_devex
+# check for a running container before stopping it
+MEAN_PID=$(docker ps -a -q -f "name=mean_devex")
+if [[ -n $MEAN_PID ]]; then
+    docker stop mean_devex
+fi
 docker run \
 -p 3030:3000 \
 -p 5858:5858 \
@@ -27,6 +31,7 @@ docker run \
 -e "GITHUB_SECRET=e3f26152b2d04e7877e1a57a07ea1d6bab63da18" \
 -e "MONGO_SEED_LOG_RESULTS=${MONGO_SEED_LOG_RESULTS-true}" \
 -e "DEVEX_PROD=${DEVEX_PROD-false}" \
+-e "DOMAIN=http://localhost:3030" \
 -ti --rm --link db_devex --name mean_devex mean/devex ${@:-bash}
 
 # after run sh dev.sh

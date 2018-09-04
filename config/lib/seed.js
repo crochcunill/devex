@@ -1,9 +1,9 @@
 'use strict';
 
-var _ = require('lodash'),
-	config = require('../config'),
-	mongoose = require('mongoose'),
-	chalk = require('chalk')
+var _ 			= require('lodash'),
+	config 		= require('../config'),
+	mongoose 	= require('mongoose'),
+	chalk 		= require('chalk')
 
 // global seed options object
 var seedOptions = {};
@@ -58,7 +58,7 @@ function reportSuccess (password) {
 	return function (user) {
 		return new Promise(function (resolve, reject) {
 			if (seedOptions.logResults) {
-				console.log(chalk.bold.red('Database Seeding:\tLocal user \'' + user.username + '\' has password set to \'' + password + '\''));
+				console.log(chalk.yellow('Database Seeding:\tLocal user \'' + user.username + '\' has password set to \'' + password + '\''));
 			}
 			resolve();
 		});
@@ -80,7 +80,7 @@ function seedTheUser (user) {
 				resolve();
 			})
 			.catch(function (err) {
-				reject(err);
+				resolve(err);
 			});
 		});
 	};
@@ -89,17 +89,27 @@ function seedTheUser (user) {
 function clearTemplates () {
 	var T = mongoose.model ('MessageTemplate');
 	return new Promise (function (resolve, reject) {
-		T.remove ({}, function () {
+		T.remove ({}, function (err) {
+			if (err) {
+				console.error(err);
+				console.error('Error removing templates');
+				reject();
+			}
 			resolve ();
 		});
 	});
 }
 
 function seedTestMessageTemplate () {
+	console.log(chalk.yellow('Database seeding:\tSeeding message templates.'));
 	var T = mongoose.model ('MessageTemplate');
 	var saveT = function (t) {
 		return new Promise (function (resolve, reject) {
 			t.save (function (err) {
+				if (err) {
+					console.error(err);
+					console.error('Error saving template');
+				}
 				resolve ();
 			});
 		});
@@ -109,13 +119,13 @@ function seedTestMessageTemplate () {
 			new T ({
 				messageCd            : 'add-user-to-company-request',
 				messageLevel         : 'request',
-				description          : 'Ask the user whether they agree to be added to this company' ,
+				description          : 'Notify a user they have been invited to join a company' ,
 				isSubscriptionType   : false,
-				messageBodyTemplate  : '<p>Hi {{user.name}}</p><br/>Whazzup about company {{org.name}}?',
-				messageShortTemplate : 'company {{org.name}} wants you dude!',
-				messageTitleTemplate : 'company {{org.name}}?',
-				emailBodyTemplate    : '<p>Hi {{user.name}}</p><br/>Whazzup about company {{org.name}}?',
-				emailSubjectTemplate : 'company {{org.name}}',
+				messageBodyTemplate  : '<p>You have been invited to join <strong>{{org.name}}</strong>.</p><p>If you accept, {{org.name}} will be able to put you forward as a team member on proposals for <i>Sprint With Us</i> opportunities.</p>',
+				messageShortTemplate : '',
+				messageTitleTemplate : 'You\'ve been invited to join {{org.name}}',
+				emailBodyTemplate    : '<p>Hi {{user.firstName}},</p><p>You\'ve been invited to join <strong>{{org.name}}</strong>. If you accept, {{org.name}} will be able to put you forward as a team member on proposals for <i>Sprint With Us</i> opportunities.</p>',
+				emailSubjectTemplate : 'You\'ve been invited to join {{org.name}}',
 				modelsRequired       : ['org'],
 				daysToArchive        : 7,
 				linkTemplate         : '/join/org/{{org._id}}',
@@ -131,13 +141,13 @@ function seedTestMessageTemplate () {
 			new T ({
 				messageCd            : 'invitation-from-company',
 				messageLevel         : 'request',
-				description          : 'Does the user want to sign up to devex, invited by company' ,
+				description          : 'Invite a user to sign up, because they have been invited by company' ,
 				isSubscriptionType   : false,
-				messageBodyTemplate  : '<p>Hi there</p><br/>Company {{org.name}} is inviting you to sign up to the <a href="{{domain}}">developer\'s exchange</a></p>',
-				messageShortTemplate : 'company {{org.name}} wants you join devex and hopefully join their company',
-				messageTitleTemplate : 'company {{org.name}} wants you join devex',
-				emailBodyTemplate    : '<p>Hi there</p><br/>Company {{org.name}} is inviting you to sign up to the <a href="{{domain}}">developer\'s exchange</a> and join them in doing great work!</p>',
-				emailSubjectTemplate : 'company {{org.name}} wants you join devex',
+				messageBodyTemplate  : '<p>You\'ve been invited to join <strong>{{org.name}}</strong>.</p><p>If you accept, {{org.name}} will be able to put you forward as a team member on proposals for <i>Sprint With Us</i> opportunities.</p>',
+				messageShortTemplate : '',
+				messageTitleTemplate : 'You\'ve been invited to join {{org.name}}',
+				emailBodyTemplate    : '<p>Hi {{user.firstName}}</p><p>You\'ve been invited to sign up on the BCDevExchange and to join <strong>{{org.name}}</strong>.</p>',
+				emailSubjectTemplate : 'Sign up and join {{org.name}}',
 				modelsRequired       : ['org'],
 				daysToArchive        : 7,
 				linkTemplate         : '/join/org/{{org._id}}',
@@ -155,9 +165,9 @@ function seedTestMessageTemplate () {
 				messageLevel         : 'info',
 				description          : 'notify the user that there were updates to an opportunity they are watching' ,
 				isSubscriptionType   : true,
-				messageBodyTemplate  : '<p>Hi there</p><br/>Opportunity {{opportunity.name}} has been updated. <a href="{{ domain }}/{{opportunity.path}}">Click here to view the opportunity</a></p>',
-				messageShortTemplate : '<a href="{{ opportunity.path }}">{{ opportunity.name }}</a>',
-				messageTitleTemplate : 'Opportunity updated',
+				messageBodyTemplate  : '<p>An opportunity you are watching has just been updated:</p><h4>{{opportunity.name}}</h4> <p><a href="{{ domain }}/{{opportunity.path}}">Click here to see the details</a></p>',
+				messageShortTemplate : '',
+				messageTitleTemplate : 'An opportunity you\'re watching has been updated',
 				emailBodyTemplate    : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/><br/> Hi {{user.displayName}}, <br/><br/> An opportunity you followed has been updated: <h4>{{ opportunity.name }}</h4> <h4><a href="{{ domain }}/{{ opportunity.path }}">See the details</a></h4> --- <i>To stop receiving notifications about this opportunity, <a href="{{ domain }}/{{ opportunity.path }}">browse to the opportunity</a> and un-watch it</i>',
 				emailSubjectTemplate : 'Opportunity {{ opportunity.name }} has been updated',
 				modelsRequired       : ['opportunity'],
@@ -165,26 +175,45 @@ function seedTestMessageTemplate () {
 				linkTemplate         : '/defaultonly',
 				actions              : [{
 					actionCd      : 'ok',
-					linkTitleTemplate : 'OK',
+					linkTitleTemplate : 'Dismiss',
 					isDefault     : true
 				}]
 			}),
 			new T ({
-				messageCd            : 'opportunity-add',
+				messageCd            : 'opportunity-add-cwu',
 				messageLevel         : 'info',
 				description          : 'notify the user that there is a new opportunity' ,
 				isSubscriptionType   : true,
-				messageBodyTemplate  : '<p>Hi there</p><br/>Opportunity {{opportunity.name}} has been added. <a href="{{ domain }}/{{opportunity.path}}">Click here to view the opportunity</a></p>',
-				messageShortTemplate : '<a href="{{ opportunity.path }}">{{ opportunity.name }}</a>',
-				messageTitleTemplate : 'Opportunity Added',
-				emailBodyTemplate    : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/><br/> Hi {{user.displayName}}, <br/><br/> We\'ve just posted a new opportunity: <h4>{{ opportunity.name }}</h4> <ul><li>Value: <b>{{ opportunity.earn }}</b></li><li>Value: <b>{{ opportunity.deadline_format_date }}</b></li></ul><h4><a href="{{ domain }}/{{ opportunity.path }}">See the details</a></h4> Have a great day!<br/><b>The BCDevExchange Team</b><br/><br/>--- <i>To stop receiving notifications about new opportunities, <a href="{{ domain }}/opportunities">browse to the opportunity listing</a> and stop listening, or visit <a href="{{ domain }}/settings/privacy">your profile</a> and uncheck "Tell me about new opportunities" </i>',
+				messageBodyTemplate  : '<p>Did you see the opportunity that was posted today?</p><h4>{{opportunity.name}}</h4> <p><a href="{{ domain }}/{{opportunity.path}}">Click here to view the details</a></p>',
+				messageShortTemplate : '',
+				messageTitleTemplate : 'A new opportunity has just been posted!',
+				emailBodyTemplate    : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/><br/> <p>Hi {{user.displayName}},</p> <p>A new opportunity has just been posted:</p> <h4>{{ opportunity.name }}</h4> <ul><li>Value: <b>{{ formattedEarnings }}</b> CAD</li><li>Deadline to apply: <b>16:00 Pacific Time</b> on <b>{{ opportunity.deadline_format_date }}</b></li></ul><h4><a href="{{ domain }}/{{ opportunity.path }}">Click here to see the details</a></h4> <p>Have a great day!<br/><b>The BCDevExchange Team</b></p> <br><br> <p><i>To stop receiving notifications about new opportunities, <a href="{{ domain }}/opportunities">browse to the opportunity list</a> and stop listening, or visit <a href="{{ domain }}/settings/privacy">your profile</a> and uncheck "Tell me about new opportunities" </i></p>',
 				emailSubjectTemplate : 'A new opportunity has just been posted!',
 				modelsRequired       : ['opportunity'],
 				daysToArchive        : 1,
 				linkTemplate         : '/defaultonly',
 				actions              : [{
 					actionCd      : 'ok',
-					linkTitleTemplate : 'OK',
+					linkTitleTemplate : 'Dismiss',
+					isDefault     : true
+				}]
+			}),
+			new T ({
+				messageCd            : 'opportunity-add-swu',
+				messageLevel         : 'info',
+				description          : 'notify the user that there is a new opportunity' ,
+				isSubscriptionType   : true,
+				messageBodyTemplate  : '<p>Did you see the opportunity that was posted today?</p><h4>{{opportunity.name}}</h4> <p><a href="{{ domain }}/{{opportunity.path}}">Click here to view the details</a></p>',
+				messageShortTemplate : '',
+				messageTitleTemplate : 'A new opportunity has just been posted!',
+				emailBodyTemplate    : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/><br/> <p>Hi {{user.displayName}},</p> <p>A new opportunity has just been posted:</p> <h4>{{ opportunity.name }}</h4> <ul><li>Value: <b>{{ formattedBudget }}</b> CAD</li><li>Deadline to apply: <b>16:00 Pacific Time</b> on <b>{{ opportunity.deadline_format_date }}</b></li></ul><h4><a href="{{ domain }}/{{ opportunity.path }}">Click here to see the details</a></h4> <p>Have a great day!<br/><b>The BCDevExchange Team</b></p> <br><br> <p><i>To stop receiving notifications about new opportunities, <a href="{{ domain }}/opportunities">browse to the opportunity list</a> and stop listening, or visit <a href="{{ domain }}/settings/privacy">your profile</a> and uncheck "Tell me about new opportunities" </i></p>',
+				emailSubjectTemplate : 'A new opportunity has just been posted!',
+				modelsRequired       : ['opportunity'],
+				daysToArchive        : 1,
+				linkTemplate         : '/defaultonly',
+				actions              : [{
+					actionCd      : 'ok',
+					linkTitleTemplate : 'Dismiss',
 					isDefault     : true
 				}]
 			}),
@@ -193,10 +222,10 @@ function seedTestMessageTemplate () {
 				messageLevel         : 'info',
 				description          : 'notify the user that they have been assigned the opportunity' ,
 				isSubscriptionType   : true,
-				messageBodyTemplate  : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/> <h2>Congratulations {{user.displayName}}!</h2> The Proposal you submitted to work on, {{ opportunity.name }}, has been selected! {{opportunity.assignor}} is offering the assignment to you.',
+				messageBodyTemplate  : '<h2>Congratulations!</h2> <p>Your proposal to work on <strong>{{ opportunity.name }}</strong> has been selected! <strong>{{opportunity.assignor}}</strong> is offering the assignment to you.',
 				messageShortTemplate : '<a href="{{ opportunity.path }}">{{ opportunity.name }}</a>',
 				messageTitleTemplate : 'Your Proposal has been selected!',
-				emailBodyTemplate    : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/> <h2>Congratulations {{user.displayName}}!</h2> The Proposal you submitted to work on, {{ opportunity.name }}, has been selected! {{opportunity.assignor}} is offering the assignment to you.',
+				emailBodyTemplate    : '<img src="https://bcdevexchange.org/modules/core/client/img/logo/new-logo-220px.png"> <br/> <h2>Congratulations {{user.displayName}}!</h2> <p>Your proposal to work on <strong>{{ opportunity.name }}</strong> has been selected! <strong>{{opportunity.assignor}}</strong> is offering the assignment to you.</p>',
 				emailSubjectTemplate : 'Your Proposal has been selected!',
 				modelsRequired       : ['opportunity'],
 				daysToArchive        : 1,
@@ -233,55 +262,55 @@ function seedTestMessageTemplate () {
 //
 // Seed the default notifications for each object type in the system
 //
-function seedNotifications () {
-	var Notification = mongoose.model ('Notification');
-	//
-	// we make notifications for add / delete for Users, Opportunities, Programs, and Projects
-	//
-	var objects = ['User', 'Program', 'Project', 'Opportunity'];
-	var events = ['Add', 'Delete', 'UpdateAny'];
-	var prefix = 'not';
-	var codes = [];
-	objects.forEach (function (obj) {
-		var lobj = obj.toLowerCase();
-		events.forEach (function (evt) {
-			var levt = evt.toLowerCase();
-			codes.push ({
-				code     : [prefix, levt, lobj].join('-'),
-				name     : evt+' '+obj,
-				// question : 'Notify me of object: ['+obj+'] event: ['+evt+']',
-				target   : obj,
-				// subject  : 'subject default',
-				// body     : 'body default',
-				event    : evt
-			});
-		});
-	});
-	// console.log (codes);
-	return Promise.all (codes.map (function (code) {
-		var notification = new Notification ({
-			code        : code.code,
-			name        : code.name,
-			// description : code.name,
-			// question    : code.question,
-			target      : code.target,
-			event       : code.event
-			// subject     : code.subject,
-			// body        : code.body
-		});
-		return new Promise (function (resolve, reject) {
-			Notification.find ({code:code.code}, function (err, result) {
-				if (err || result.length > 0) resolve ();
-				else {
-					notification.save (function (err, m) {
-						// if (err) console.error (err);
-						resolve (m);
-					});
-				}
-			});
-		});
-	}));
-}
+// function seedNotifications () {
+// 	var Notification = mongoose.model ('Notification');
+// 	//
+// 	// we make notifications for add / delete for Users, Opportunities, Programs, and Projects
+// 	//
+// 	var objects = ['User', 'Program', 'Project', 'Opportunity'];
+// 	var events = ['Add', 'Delete', 'UpdateAny'];
+// 	var prefix = 'not';
+// 	var codes = [];
+// 	objects.forEach (function (obj) {
+// 		var lobj = obj.toLowerCase();
+// 		events.forEach (function (evt) {
+// 			var levt = evt.toLowerCase();
+// 			codes.push ({
+// 				code     : [prefix, levt, lobj].join('-'),
+// 				name     : evt+' '+obj,
+// 				// question : 'Notify me of object: ['+obj+'] event: ['+evt+']',
+// 				target   : obj,
+// 				// subject  : 'subject default',
+// 				// body     : 'body default',
+// 				event    : evt
+// 			});
+// 		});
+// 	});
+// 	// console.log (codes);
+// 	return Promise.all (codes.map (function (code) {
+// 		var notification = new Notification ({
+// 			code        : code.code,
+// 			name        : code.name,
+// 			// description : code.name,
+// 			// question    : code.question,
+// 			target      : code.target,
+// 			event       : code.event
+// 			// subject     : code.subject,
+// 			// body        : code.body
+// 		});
+// 		return new Promise (function (resolve, reject) {
+// 			Notification.find ({code:code.code}, function (err, result) {
+// 				if (err || result.length > 0) resolve ();
+// 				else {
+// 					notification.save (function (err, m) {
+// 						// if (err) console.error (err);
+// 						resolve (m);
+// 					});
+// 				}
+// 			});
+// 		});
+// 	}));
+// }
 
 // report the error
 function reportError (reject) {
@@ -345,8 +374,9 @@ module.exports.start = function start(options) {
 			displayName: 'Test Government',
 			roles: ['user', 'gov']
 		});
+
 		Promise.resolve ()
-		.then (seedNotifications)
+		// .then (seedNotifications)
 		.then (function () {
 			// If production, only seed admin using the ADMINPW environment parameter
 			if (devexProd) {
@@ -382,7 +412,6 @@ module.exports.start = function start(options) {
 				//
 				// admin account
 				//
-				Promise.resolve()
 				.then(function() {
 					var password = process.env.ADMINPW;
 					return password || 'adminadmin';

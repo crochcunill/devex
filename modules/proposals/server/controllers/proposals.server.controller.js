@@ -19,25 +19,22 @@ request : <code>-request
 /**
  * Module dependencies.
  */
-var path = require('path'),
-	mongoose = require('mongoose'),
-	Proposal = mongoose.model('Proposal'),
-	User = mongoose.model('User'),
-	Opportunity = mongoose.model('Opportunity'),
-	errorHandler = require(path.resolve('./modules/core/server/controllers/errors.server.controller')),
-	helpers = require(path.resolve('./modules/core/server/controllers/core.server.helpers')),
-	Opportunities = require(path.resolve('./modules/opportunities/server/controllers/opportunities.server.controller')),
-	_ = require('lodash'),
-	multer = require('multer'),
-	config = require(path.resolve('./config/config')),
-	Notifications = require(path.resolve('./modules/notifications/server/controllers/notifications.server.controller')),
-	github = require(path.resolve('./modules/core/server/controllers/core.server.github'))
-	;
+var path 			= require('path'),
+	mongoose 		= require('mongoose'),
+	Proposal 		= mongoose.model('Proposal'),
+	User 			= mongoose.model('User'),
+	errorHandler 	= require(path.resolve('./modules/core/server/controllers/errors.server.controller')),
+	helpers 		= require(path.resolve('./modules/core/server/controllers/core.server.helpers')),
+	Opportunities 	= require(path.resolve('./modules/opportunities/server/controllers/opportunities.server.controller')),
+	_ 				= require('lodash'),
+	multer 			= require('multer'),
+	config 			= require(path.resolve('./config/config'));
 
 var userfields = '_id displayName firstName lastName email phone address username profileImageURL \
 					businessName businessAddress businessContactName businessContactPhone businessContactEmail \
 					roles provider';
-var streamFile = function (res, file, name, mime) {
+
+var streamFile = (res, file, name, mime) => {
 	var fs = require ('fs');
 	fs.exists (file, function (yes) {
 		if (!yes) {
@@ -63,13 +60,10 @@ var streamFile = function (res, file, name, mime) {
 var adminRole = function (opportunity) {
 	return opportunity.code+'-admin';
 };
-var memberRole = function (opportunity) {
-	return opportunity.code;
-};
-var requestRole = function (opportunity) {
-	return opportunity.code+'-request';
-};
 var ensureAdmin = function (opportunity, user) {
+	if (!user) {
+		return false;
+	}
 	return !(!~user.roles.indexOf (adminRole(opportunity)) && !~user.roles.indexOf ('admin'));
 };
 var countStatus = function (id) {
@@ -87,11 +81,10 @@ var countStatus = function (id) {
 				}
 			}
 		])
-		.cursor({ batchSize: 1000, async: true })
-		.exec()
-		.then(function(cursor) {
-			resolve(cursor);
-		});
+		.cursor()
+		.exec();
+
+		resolve(cursor);
 	});
 };
 // -------------------------------------------------------------------------
@@ -99,27 +92,30 @@ var countStatus = function (id) {
 // stats
 //
 // -------------------------------------------------------------------------
-exports.stats = function (req, res) {
+exports.stats = (req, res) => {
 	var op = req.opportunity;
 	var ret = {
 		following: 0
 	};
-	Notifications.countFollowingOpportunity (op.code)
-	.then (function (result) {
-		ret.following = result;
+
+	Promise.resolve()
+	.then (() => {
+		if (op.watchers) {
+			ret.following = op.watchers.length;
+		}
 		ret.submitted = 0;
 		ret.draft = 0;
 		return countStatus (op._id);
 	})
-	.then (function (result) {
-		result.toArray().then(function(docs) {
-			docs.forEach(function(doc) {
-				ret[doc._id.toLowerCase()] = doc.count;
-			});
+	.then (result => {
+		result.eachAsync(function(doc) {
+			ret[doc._id.toLowerCase()] = doc.count;
+		})
+		.then(function() {
 			res.json(ret);
 		});
 	})
-	.catch (function (err) {
+	.catch (err => {
 		res.status(422).send ({
 			message: errorHandler.getErrorMessage(err)
 		});
@@ -321,7 +317,12 @@ exports.update = function (req, res) {
 	// copy over everything passed in. This will overwrite the
 	// audit fields, but they get updated in the following step
 	//
-	var proposal = _.assign (req.proposal, req.body);
+	// var proposal = _.assign (req.proposal, req.body);
+	var proposal = _.mergeWith(req.proposal, req.body, (objValue, srcValue) => {
+		if (_.isArray(objValue)) {
+			return srcValue;
+		}
+	});
 	//
 	// set the audit fields so we know who did what when
 	//
@@ -395,10 +396,13 @@ exports.assignswu = function (req, res) {
 	proposal.isAssigned = true;
 	helpers.applyAudit (proposal, req.user);
 	saveProposal (proposal)
-	.then (function () {
-		return Opportunities.assignswu (proposal.opportunity._id, proposal._id, proposal.user, req.user);
+	.then (function (updatedProposal) {
+		Opportunities.assignswu (proposal.opportunity._id, proposal._id, proposal.user, req.user);
+		return updatedProposal;
 	})
-	.then (function () {res.json (proposal); })
+	.then (function (updatedProposal) {
+		res.json (updatedProposal);
+	})
 	.catch (function (e) {
 		res.status(422).send ({ message: errorHandler.getErrorMessage(e) });
 	});
@@ -485,7 +489,7 @@ exports.forOpportunity = function (req, res) {
 	if (!ensureAdmin (req.opportunity, req.user)) {
 		return res.json ([]);
 	}
-	Proposal.find({opportunity:req.opportunity._id, status:'Submitted'}).sort('created')
+	Proposal.find({opportunity:req.opportunity._id, $or: [{status:'Submitted'}, {status: 'Assigned'}]}).sort('created')
 	.populate('createdBy', 'displayName')
 	.populate('updatedBy', 'displayName')
 	.populate('opportunity')

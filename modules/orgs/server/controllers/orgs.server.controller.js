@@ -29,7 +29,7 @@ var path = require('path'),
 	User = mongoose.model('User'),
 	Capability = mongoose.model('Capability'),
 	Proposal = mongoose.model('Proposal'),
-	Notifications = require(path.resolve('./modules/notifications/server/controllers/notifications.server.controller')),
+	// Notifications = require(path.resolve('./modules/notifications/server/controllers/notifications.server.controller')),
 	sendMessages = require(path.resolve('./modules/messages/server/controllers/messages.controller')).sendMessages,
 	Proposals = require(path.resolve('./modules/proposals/server/controllers/proposals.server.controller')),
 	errorHandler = require(path.resolve('./modules/core/server/controllers/errors.server.controller')),
@@ -87,18 +87,18 @@ var saveUser = function (user) {
 		});
 	});
 };
-var notifyUser = function (org) {
-	return function (user) {
-		Notifications.notifyUserAdHoc ('user-added-to-company', {
-			username    : user.displayName,
-			useremail   : user.email,
-			adminname   : org.adminName,
-			adminemail  : org.adminEmail,
-			companyname : org.name
-		});
-		return Promise.resolve ();
-	};
-};
+// var notifyUser = function (org) {
+// 	return function (user) {
+// 		Notifications.notifyUserAdHoc ('user-added-to-company', {
+// 			username    : user.displayName,
+// 			useremail   : user.email,
+// 			adminname   : org.adminName,
+// 			adminemail  : org.adminEmail,
+// 			companyname : org.name
+// 		});
+// 		return Promise.resolve ();
+// 	};
+// };
 // -------------------------------------------------------------------------
 //
 // find a user give the passed in search
@@ -106,7 +106,7 @@ var notifyUser = function (org) {
 // -------------------------------------------------------------------------
 var getUsers = function (terms) {
 	return new Promise (function (resolve, reject) {
-		User.find (terms, '_id email displayName username profileImageURL orgsAdmin orgsMember orgsPending').exec (function (err, user) {
+		User.find (terms, '_id email displayName firstName username profileImageURL orgsAdmin orgsMember orgsPending').exec (function (err, user) {
 			if (err) reject (err);
 			else resolve (user);
 		});
@@ -210,16 +210,24 @@ var collapseCapabilities = function (org) {
 //
 // -------------------------------------------------------------------------
 var checkCapabilities = function (org) {
+	// make sure an org was found
+	if (!org) {
+		return;
+	}
 	return collapseCapabilities (org)
 	.then (getRequiredCapabilities)
 	.then (function (capabilities) {
 		var c = org.capabilities.map (function (c) {return c}).reduce (function (a, c) {a[c]=true;return a;}, {});
-		org.isCapable = capabilities.map (function (ca) {return c[ca._id.toString()] || false}).reduce (function (a, c) {return a && c;});
+		org.isCapable = capabilities.map (function (ca) {return c[ca._id.toString()] || false}).reduce (function (a, c) {return a && c;}, true);
 		org.metRFQ = org.isCapable && org.isAcceptedTerms && org.members.length >= 2;
 		return org;
 	})
 };
 var minisave = function (org) {
+	// make sure an org was found
+	if (!org) {
+		return;
+	}
 	return new Promise (function (resolve, reject) {
 		org.save (function (err, model) {
 			if (err) reject (err);
@@ -245,7 +253,7 @@ var resolveOrg = function (org) {
 var saveOrg = function (req, res) {
 	return function (org) {
 		var additionsList = org.additionsList;
-		if (additionsList && additionsList.found.length === 0 && additionsList.notfound.length === 0) additionsList = null;
+		if (additionsList && additionsList.found.length === 0 && additionsList.notFound.length === 0) additionsList = null;
 		helpers.applyAudit (org, req.user);
 		checkCapabilities (org)
 		.then (function (org) {
@@ -311,7 +319,7 @@ var saveOrgReturnMessage = function (req, res) {
 					getOrgById (neworg._id)
 					.then (function (o) {
 						res.status(200).json ({
-							message: '<h4>Success!</h4> You have been added to '+org.name
+							message: '<h4>Success!</h4> You are now a member of '+org.name
 						})
 					})
 					.catch (function (err) {
@@ -365,7 +373,7 @@ var addMember = function (user, org) {
 	return Promise.resolve (user)
 	.then (addUserTo (org, 'members'))
 	.then (saveUser)
-	.then (notifyUser (org))
+	// .then (notifyUser (org))
 	.then (resolveOrg (org));
 };
 var addAdmin = function (user, org) {
@@ -423,34 +431,28 @@ var removeAdmin = function (user, org) {
 var inviteMembersWithMessages = function (emaillist, org) {
 	var list = {
 		found    : [],
-		notfound : []
+		notFound : []
 	};
 	if (!emaillist) return Promise.resolve (list);
-	//
-	// flatten out the members and admins arrays so that later on the
-	// addToSet function truly works on duplicates
-	//
-	org.admins = org.admins.map (function (obj) {return obj.id;});
-	org.members = org.members.map (function (obj) {return obj.id;});
 	return getUsers ({email : {$in : emaillist}})
 	.then (function (users) {
 		if (users) {
 			list.found = users;
 			var usersIndex = users.reduce (function (accum, curr) {accum[curr.email] = true; return accum;}, {});
 			emaillist.forEach (function (email) {
-				if (!usersIndex[email]) list.notfound.push ({email:email});
+				if (!usersIndex[email]) list.notFound.push ({email:email});
 			});
 		}
 	})
 	.then (function () {
 		sendMessages ('add-user-to-company-request', list.found, {org:org});
-		sendMessages ('invitation-from-company', list.notfound, {org:org});
+		sendMessages ('invitation-from-company', list.notFound, {org:org});
 
 		// record users so that they have 'permission' to self add
 		if (!org.invited) {
 			org.invited = [];
 		}
-		list.notfound.forEach(function(entry) {
+		list.notFound.forEach(function(entry) {
 			org.invited.push(entry.email);
 		});
 
@@ -462,37 +464,9 @@ var inviteMembersWithMessages = function (emaillist, org) {
 		return Promise.resolve (list);
 	});
 };
-var inviteMembersWithNotification = function (emaillist, org) {
-	var list = {
-		found    : [],
-		notfound : []
-	};
-	if (!emaillist) return Promise.resolve (list);
-	//
-	// flatten out the members and admins arrays so that later on the
-	// addToSet function truly works on duplicates
-	//
-	org.admins = org.admins.map (function (obj) {return obj.id;});
-	org.members = org.members.map (function (obj) {return obj.id;});
-	return getUsers ({email : {$in : emaillist}})
-	.then (function (users) {
-		if (users) {
-			list.found = users;
-			var usersIndex = users.reduce (function (accum, curr) {accum[curr.email] = true; return accum;}, {});
-			emaillist.forEach (function (email) {
-				if (!usersIndex[email]) list.notfound.push ({email:email});
-			});
-		}
-		return users;
-	})
-	.then (addMembers (org))
-	.then (function () {
-		return Promise.resolve (list);
-	});
-};
+
 var inviteMembers = function (emaillist, org) {
-	if (config.feature.messages) return inviteMembersWithMessages (emaillist, org);
-	else return inviteMembersWithNotification (emaillist, org);
+	return inviteMembersWithMessages (emaillist, org);
 }
 
 exports.removeUserFromMemberList = function (req, res) {
@@ -544,18 +518,25 @@ exports.update = function (req, res) {
 	// copy over everything passed in. This will overwrite the
 	// audit fields, but they get updated in the following step
 	//
-	var org        = _.assign (req.org, req.body);
+	// We use lodash mergeWith and a customizer to handle arrays.  By default lodash merge will concatenate arrays, which means that
+	// items can never be removed.  The customizer defaults to also use the incoming array.
+	// see https://lodash.com/docs/4.17.10#mergeWith
+	var org = _.mergeWith(req.org, req.body, (objValue, srcValue) => {
+		if (_.isArray(objValue)) {
+			return srcValue;
+		}
+	});
 	org.adminName  = req.user.displayName;
 	org.adminEmail = req.user.email;
 
 	var additionsList = {
 		found : [],
-		notfound : []
+		notFound : []
 	};
 	inviteMembers (list, org)
 	.then (function (newlist) {
 		additionsList.found = newlist.found;
-		additionsList.notfound = newlist.notfound;
+		additionsList.notFound = newlist.notFound;
 		org.additionsList = additionsList;
 		return org;
 	})

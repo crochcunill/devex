@@ -38,23 +38,57 @@ ul[dnd-list] li {
     margin-bottom: -1px;
 }
 
+ul.question-input-list {
+	list-style-type: none;
+}
+
+li.question-input {
+	text-align: right;
+	max-height: 42px;
+}
+
+ul.question-list {
+	list-style-type: none;
+}
+li.question-item {
+	max-height: 42px;
+	min-height: 42px;
+	overflow-y: hidden;
+	line-height: 3.5em;
+}
+td.question-cell {
+	border: solid;
+	border-width: 1px;
+	border-color: lightgray;
+}
+
 /**
  * Show selected elements in green
  */
-ul[dnd-list] li.selected {
+ul li.selected, td.selected {
     background-color: #dff0d8;
     color: #3c763d;
 }
 
-textarea.long-question {
+div.long-question {
 	font-family: Arial, sans-serif;
 	font-size: 12pt;
 	width: 100%;
 	height: 500px;
 	margin-left: 10px;
 	resize: none;
+	border: solid;
+	border-width: 1px;
+	border-color: lightgray;
 }
-
+div.opportunity-header {
+    margin: 2em 0 4em;
+}
+.opportunity-title {
+    font-size: 2em;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
 .opportunity-description {
 	display: block;
 	clear: both;
@@ -64,6 +98,16 @@ textarea.long-question {
 	display: block;
 	clear: both;
 	margin: 4px 0 4px 0;
+}
+
+td.opportunity-details {
+    vertical-align: top;
+    padding: 0 25px 15px 0;
+    white-space: nowrap;
+}
+td.opportunity-details:last-child {
+ white-space: revert;
+ width: 99%;
 }
 
 h4.list-group-item-heading.opportunities {
@@ -76,7 +120,7 @@ span.edit-link {
 	margin-right: 10px;
 }
 
-.list-group div.list-group-item, 
+.list-group div.list-group-item,
 .list-group a.list-group-item {
 	overflow: hidden;
 }
@@ -86,7 +130,9 @@ tr.spaceUnder>td {
 }
 
 input.scoreBox {
-	width: 3.5em;
+	width: 35px;
+	margin-right: 1em;
+	text-align: right;
 }
 
 input::-webkit-outer-spin-button,
@@ -105,4 +151,84 @@ span.screened-out {
 div.rejected {
 	text-decoration: line-through;
 	color: darkred;
+}
+
+.opportunity-list {
+	padding: 20px 0;
+	margin-bottom: 100px;
+}
+.opportunity-list-header {
+	border-bottom: 2px dotted #e3e3e3;
+	font-size: 1.42em;
+	font-weight: 600;
+	padding: 10px 5px;
+}
+.opportunity-count {
+	margin-bottom: 5px;
+	margin-left: 5px;
+	font-size: .7em;
+	background-color: #555;
+	font-weight: normal;
+	padding: 4px 9px;
+}
+.value-tally {
+	font-size: .8em;
+	margin-top: 1px;
+}
+.score-form {
+	width: 60%;
+	margin: 25px auto;
+}
+/* Opportunity addenda styling */
+ol.addendum-list {
+    -webkit-padding-start: 20px;
+    max-height: 340px;
+    overflow-y: auto;
+}
+li.addendum-list-item {
+	padding: 1em 0;
+    border-bottom: 1px dotted #f6f8fa;
+}
+span.addendum-item, div.addendum-item {
+	margin-left: 25px;
+	padding-bottom: 1em;
+	border-bottom: 1px solid gray;
+}
+div.addendum-item-editing {
+	margin-left: 25px;
+	padding-bottom: 1em;
+}
+div.addendum-created {
+	margin-bottom: .5em;
+	font-size: smaller;
+    font-weight: 600;
+    color: #b3b3b3;
+}
+div.add-button-wrapper {
+	display: flex;
+	align-items: center;
+}
+@media (min-width: 768px) {
+    .sticky-sidebar {
+        padding: 20px 0 20px 50px;
+        position: -webkit-sticky;
+        top: 40px;
+        bottom: 40px;
+    }
+}
+@media (max-width: 767px) {
+    .sticky-sidebar {
+        padding: 0;
+        position: relative;
+    }
+}
+div.overline {
+    text-transform: uppercase;
+    font-size: .8em;
+    letter-spacing: .015em;
+    margin-bottom: 3px;
+}
+div.gov-contact {
+    font-size: 1.1em;
+    font-weight: 600;
 }

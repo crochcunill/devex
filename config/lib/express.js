@@ -38,7 +38,7 @@ module.exports.initLocalVariables = function (app) {
   app.locals.title = config.app.title;
   app.locals.description = config.app.description;
   if (config.secure && config.secure.ssl === true) {
-    app.locals.secure = config.secure.ssl;
+  	app.locals.secure = config.secure.ssl;
   }
   app.locals.keywords = config.app.keywords;
   app.locals.googleAnalyticsTrackingID = config.app.googleAnalyticsTrackingID;
@@ -50,12 +50,14 @@ module.exports.initLocalVariables = function (app) {
   app.locals.favicon = config.favicon;
   app.locals.env = process.env.NODE_ENV;
   app.locals.domain = config.domain;
+  app.locals.sessionTimeout = config.sessionTimeout || 300;
+  app.locals.sessionTimeoutWarning = config.sessionTimeoutWarning || 300;
 
   // Passing the request url to environment locals
   app.use(function (req, res, next) {
-    res.locals.host = req.protocol + '://' + req.hostname;
-    res.locals.url = req.protocol + '://' + req.headers.host + req.originalUrl;
-    next();
+	res.locals.host = req.protocol + '://' + req.hostname;
+	res.locals.url = req.protocol + '://' + req.headers.host + req.originalUrl;
+	next();
   });
 
   app.enable('trust proxy');
@@ -67,18 +69,18 @@ module.exports.initLocalVariables = function (app) {
 module.exports.initMiddleware = function (app) {
   // Should be placed before express.static
   app.use(compress({
-    filter: function (req, res) {
-      var result = (/json|text|javascript|css|font|svg/).test(res.getHeader('Content-Type'));
-      // console.log ('inside filter test and result is ', result);
-      return result;
-    },
-    level: 9
+	filter: function (req, res) {
+	  var result = (/json|text|javascript|css|font|svg/).test(res.getHeader('Content-Type'));
+	  // console.log ('inside filter test and result is ', result);
+	  return result;
+	},
+	level: 9
   }));
 
   app.use ('/uploads/*', function (req, res, next) {
-    var pathname = req.baseUrl;
-    if (!!~pathname.indexOf ('file-')) res.status(403).send('<h1>403 Forbidden</h1>');
-    else next();
+	var pathname = req.baseUrl;
+	if (!!~pathname.indexOf ('file-')) res.status(403).send('<h1>403 Forbidden</h1>');
+	else next();
   });
 
   // Initialize favicon middleware
@@ -86,21 +88,21 @@ module.exports.initMiddleware = function (app) {
 
   // Enable logger (morgan) if enabled in the configuration file
   if (_.has(config, 'log.format')) {
-    app.use(morgan(logger.getLogFormat(), logger.getMorganOptions()));
+	app.use(morgan(logger.getLogFormat(), logger.getMorganOptions()));
   }
 
   // Environment dependent middleware
   if (process.env.NODE_ENV === 'development') {
-    // Disable views cache
-    app.set('view cache', false);
+	// Disable views cache
+	app.set('view cache', false);
   } else if (process.env.NODE_ENV === 'production') {
-    app.locals.cache = 'memory';
+	app.locals.cache = 'memory';
   }
 
   // Request body parsing middleware should be above methodOverride
   app.use(bodyParser.urlencoded({
-    extended: true,
-    limit: '50mb'
+	extended: true,
+	limit: '50mb'
   }));
   app.use(bodyParser.json({limit: '50mb'}));
   app.use(methodOverride());
@@ -115,7 +117,7 @@ module.exports.initMiddleware = function (app) {
  */
 module.exports.initViewEngine = function (app) {
   app.engine('server.view.html', hbs.express4({
-    extname: '.server.view.html'
+	extname: '.server.view.html'
   }));
   app.set('view engine', 'server.view.html');
   app.set('views', path.resolve('./'));
@@ -126,12 +128,6 @@ module.exports.initViewEngine = function (app) {
  */
 module.exports.initSession = function (app, db) {
   // Express MongoDB session storage
-  //
-  // CC : modified so that session persists in development
-  // an on localhost - makes testing easier - still remove
-  // stored session for production, which would mean all
-  // uses of openshift
-  //
   var sessionParameters = {
     saveUninitialized : true,
     resave            : false,
@@ -142,16 +138,36 @@ module.exports.initSession = function (app, db) {
       httpOnly : config.sessionCookie.httpOnly,
       secure   : config.sessionCookie.secure && config.secure.ssl
     }
+  };
+  //
+  // CC : BA-698 hopefully fix the memory leak issue. If this
+  // does not work in production, then make the shareConnection switch false
+  // to try giving mongoDb connector its own connection and not
+  // share the mongoose one
+  //
+  var shareConnection = true;
+  if (shareConnection) {
+  	sessionParameters.store = new MongoStore ({
+  	  mongooseConnection : db,
+  	  collection         : config.sessionCollection
+  	});
   }
-  if (config.app.domain === 'http://localhost:3030' || process.env.NODE_ENV === 'development') {
-    sessionParameters.cookie.maxAge = config.sessionCookie.maxAge;
+  else {
     sessionParameters.store = new MongoStore ({
-      mongooseConnection : db.connection,
-      collection         : config.sessionCollection
+      url        : config.db.uri,
+      collection : config.sessionCollection
     });
   }
+  //
+  // CC : modified so that session persists in development
+  // an on localhost - makes testing easier - still remove
+  // stored session for production, which would mean all
+  // uses of openshift
+  //
+  if (config.app.domain === 'http://localhost:3030' || process.env.NODE_ENV === 'development') {
+    sessionParameters.cookie.maxAge = config.sessionCookie.maxAge;
+  }
   app.use(session(sessionParameters));
-
   // Add Lusca CSRF Middleware
   app.use(lusca(config.csrf));
 };
@@ -161,7 +177,7 @@ module.exports.initSession = function (app, db) {
  */
 module.exports.initModulesConfiguration = function (app, db) {
   config.files.server.configs.forEach(function (configPath) {
-    require(path.resolve(configPath))(app, db);
+	require(path.resolve(configPath))(app, db);
   });
 };
 
@@ -176,9 +192,9 @@ module.exports.initHelmetHeaders = function (app) {
   app.use(helmet.noSniff());
   app.use(helmet.ieNoOpen());
   app.use(helmet.hsts({
-    maxAge: SIX_MONTHS,
-    includeSubdomains: true,
-    force: true
+	maxAge: SIX_MONTHS,
+	includeSubdomains: true,
+	force: true
   }));
   app.disable('x-powered-by');
 };
@@ -192,7 +208,7 @@ module.exports.initModulesClientRoutes = function (app) {
 
   // Globbing static routing
   config.folders.client.forEach(function (staticPath) {
-    app.use(staticPath, express.static(path.resolve('./' + staticPath)));
+	app.use(staticPath, express.static(path.resolve('./' + staticPath)));
   });
 };
 
@@ -202,7 +218,7 @@ module.exports.initModulesClientRoutes = function (app) {
 module.exports.initModulesServerPolicies = function (app) {
   // Globbing policy files
   config.files.server.policies.forEach(function (policyPath) {
-    require(path.resolve(policyPath)).invokeRolesPolicies();
+	require(path.resolve(policyPath)).invokeRolesPolicies();
   });
 };
 
@@ -212,7 +228,7 @@ module.exports.initModulesServerPolicies = function (app) {
 module.exports.initModulesServerRoutes = function (app) {
   // Globbing routing files
   config.files.server.routes.forEach(function (routePath) {
-    require(path.resolve(routePath))(app);
+	require(path.resolve(routePath))(app);
   });
 };
 
@@ -221,16 +237,16 @@ module.exports.initModulesServerRoutes = function (app) {
  */
 module.exports.initErrorRoutes = function (app) {
   app.use(function (err, req, res, next) {
-    // If the error object doesn't exists
-    if (!err) {
-      return next();
-    }
+	// If the error object doesn't exists
+	if (!err) {
+	  return next();
+	}
 
-    // Log it
-    console.error(err.stack);
+	// Log it
+	console.error(err.stack);
 
-    // Redirect to error page
-    res.redirect('/server-error');
+	// Redirect to error page
+	res.redirect('/server-error');
   });
 };
 

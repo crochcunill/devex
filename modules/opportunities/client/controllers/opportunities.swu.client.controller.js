@@ -24,19 +24,12 @@
 	// Controller the view of the opportunity page
 	//
 	// =========================================================================
-	.controller('OpportunityViewSWUController', function ($scope, capabilities, $state, $stateParams, $sce, org, opportunity, Authentication, OpportunitiesService, ProposalsService, Notification, modalService, $q, ask, subscriptions, myproposal, dataService, NotificationsService, CapabilitiesMethods, OpportunitiesCommon) {
+	.controller('OpportunityViewSWUController', function (capabilities, $state, $stateParams, $sce, org, opportunity, Authentication, OpportunitiesService, ProposalsService, Notification, modalService, ask, myproposal, CapabilitiesMethods, OpportunitiesCommon) {
 		if (!opportunity) {
 			console.error ('no opportunity provided');
 			$state.go('opportunities.list');
 		}
 		var vm                    = this;
-		// vm.features = window.features;
-		//
-		// set the notification code for updates to this opp, and set the vm flag to current state
-		//
-		var notificationCode = 'not-update-'+opportunity.code;
-		vm.notifyMe = subscriptions.map (function (s) {return (s.notificationCode === notificationCode);}).reduce (function (a, c) {return (a || c);}, false);
-
 		vm.myproposal             = myproposal;
 		vm.projectId              = $stateParams.projectId;
 		vm.opportunity            = opportunity;
@@ -68,6 +61,10 @@
 		vm.display.description    = $sce.trustAsHtml(vm.opportunity.description);
 		vm.display.evaluation     = $sce.trustAsHtml(vm.opportunity.evaluation);
 		vm.display.criteria       = $sce.trustAsHtml(vm.opportunity.criteria);
+		vm.display.addenda		  = vm.opportunity.addenda;
+		vm.display.addenda.forEach(function(addendum) {
+			addendum.cleanDesc = $sce.trustAsHtml(addendum.description);
+		});
 		vm.trust = $sce.trustAsHtml;
 		vm.canApply = org && org.metRFQ;
 		vm.opportunity.hasOrg = vm.canApply;
@@ -162,631 +159,6 @@
 		};
 		// -------------------------------------------------------------------------
 		//
-		// constants for evaluation stages for swu proposals
-		//
-		// -------------------------------------------------------------------------
-		vm.stages = {
-			new        		: 0,
-			pending_review	: 1,
-			questions  		: 2,
-			questions_saved : 3,
-			code_scores		: 4,
-			interview  		: 5,
-			price      		: 6,
-			assigned   		: 7,
-			all_fail		: 8
-		};
-		vm.beforeStage = function (stage) {
-			return vm.opportunity.evaluationStage < vm.stages[stage];
-		}
-		vm.pastStage = function (stage) {
-			return vm.opportunity.evaluationStage > vm.stages[stage];
-		};
-		vm.stageIs = function (stage) {
-			return vm.opportunity.evaluationStage === vm.stages[stage];
-		};
-		vm.weights = {
-			price: 0.1,
-			interview: 0.25,
-			question: 0.2,
-			skill: 0.2,
-			codechallenge: 0.25
-		};
-		vm.maxPoints = 100;
-		vm.getTopProposal = function() {
-			if (vm.proposals && vm.proposals.length > 0) {
-				vm.totalAndSort();
-				return vm.proposals[0];
-			}
-			return null;
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Evaluate question rankings or calculate skill points
-		//
-		// -------------------------------------------------------------------------
-		var buildQuestionPivot = function () {
-			if (!vm.canEdit) return;
-			ProposalsService.forOpportunity ({opportunityId:vm.opportunity._id}).$promise
-			.then (function (proposals) {
-				vm.proposals = proposals;
-				// vm.canProgress ();
-				//
-				// removed hack as this is now in the right place in the edit opportunity
-				//
-				//
-				// make an array of responses (question objects) by question
-				//
-				vm.responses = [];
-				var questionIndex;
-				for (questionIndex=0; questionIndex<vm.opportunity.questions.length; questionIndex++) {
-					vm.responses[questionIndex] = [];
-					vm.proposals.forEach (function (proposal) {
-						if (vm.opportunity.evaluationStage === vm.stages.pending_review || !proposal.questions[questionIndex].rejected) {
-							vm.responses[questionIndex].push (proposal.questions[questionIndex])
-						}
-					});
-				}
-				//
-				// if we have not yet begun evaluating do some question order randomizing
-				//
-				if (vm.opportunity.evaluationStage === vm.stages.new && vm.closing === 'CLOSED') {
-					vm.responses.forEach (function (qset) {
-						//
-						// randomize the responses
-						//
-						qset.forEach (function (resp) {
-							resp.rank = Math.floor((Math.random() * 1000) + 1);
-						});
-						//
-						// now resolve those to 1 through whatever
-						//
-						qset.sort (function (a, b) {
-							if (a.rank < b.rank) return -1;
-							else if (a.rank > b.rank) return 1;
-							else return 0;
-						});
-						for (var i=0; i<qset.length; i++) {
-							qset[i].rank = i+1;
-						}
-					});
-					//
-					// and now figure out the team score, hopefully only once
-					//
-					var maxScore = vm.opportunity.phases.aggregate.capabilitySkills.length;
-					vm.proposals.forEach (function (proposal) {
-						var p = {};
-						proposal.phases.aggregate.capabilitySkills.forEach (function (skillid) {
-							p[skillid.toString()] = true;
-						});
-						proposal.scores.skill = 0;
-						vm.opportunity.phases.aggregate.capabilitySkills.forEach (function (skill) {
-							if (p[skill._id.toString()]) proposal.scores.skill++;
-						});
-						if (maxScore > 0) {
-							proposal.scores.skill = Math.round((proposal.scores.skill / maxScore) * (vm.weights.skill * vm.maxPoints) * 100) / 100;
-						}
-						else {
-							proposal.scores.skill = 0;
-						}
-					});
-					//
-					// save all the proposals now with the new question rankings if applicable
-					// also because this will cause scoring to run on each proposal as well
-					//
-					vm.totalAndSort();
-					vm.opportunity.evaluationStage = vm.stages.pending_review;
-					vm.saveOpportunity ();
-					vm.saveProposals ();
-				}
-			});
-		};
-		buildQuestionPivot ();
-		vm.resetEvaluation = function () {
-
-			var q = 'WARNING: This will reset the current evaluation and any calculations or entered data will be lost.  Proceed?';
-			ask.yesNo (q).then (function (r) {
-				if (r) {
-					vm.opportunity.evaluationStage = vm.stages.new;
-					vm.proposal = null;
-					vm.proposals.forEach(function(proposal) {
-						proposal.scores.skill = 0;
-						proposal.scores.question = 0;
-						proposal.scores.codechallenge = 0;
-						proposal.scores.interview = 0;
-						proposal.scores.total = 0;
-						proposal.scores.price = 0;
-						proposal.isAssigned = false;
-						proposal.screenedIn = false;
-						proposal.questions.forEach(function(question) {
-							question['rejected'] = false;
-						})
-					})
-					vm.totalAndSort();
-					vm.saveProposals();
-					vm.saveOpportunity();
-				}
-			});
-		};
-		vm.completeQuestionReview = function() {
-
-			var q = 'WARNING: This will open up the evaluation to the opportunity owner.  Proceed?';
-			ask.yesNo (q).then (function (r) {
-				if (r) {
-
-					vm.opportunity.evaluationStage = vm.stages.questions;
-					vm.saveOpportunity();
-				}
-			});
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Questions Modal
-		//
-		// -------------------------------------------------------------------------
-		vm.questions = function () {
-			modalService.showModal ({
-				size: 'lg',
-				templateUrl: '/modules/opportunities/client/views/swu-opportunity-modal-questions.html',
-				controller: function ($scope, $uibModalInstance) {
-
-					$scope.data                = {};
-					$scope.data.questions      = [];
-					$scope.data.proposals      = vm.proposals;
-					$scope.data.nproposals     = vm.proposals.length;
-					$scope.data.questions      = vm.opportunity.questions;
-					$scope.data.responses      = vm.responses;
-					$scope.data.totalQuestions = vm.opportunity.questions.length;
-					$scope.data.currentPage    = 1;
-
-					$scope.data.model = {
-						selected: null,
-						questions: {}
-					};
-
-					vm.responses.forEach(function(respArray) {
-
-						// set initial order by current ranking
-						respArray.sort(function(a, b) {
-							return a.rank - b.rank;
-						});
-						$scope.data.model.questions[respArray[0].question] = respArray;
-					})
-					$scope.pageChanged = function() {
-						$scope.data.model.selected = null;
-					}
-
-					$scope.close = function () {
-						$uibModalInstance.close({});
-					};
-					$scope.ok = function () {
-						$uibModalInstance.close({
-							action: 'save',
-							questions: $scope.data.model.questions
-						});
-					};
-					$scope.commit = function () {
-						var q = 'Are you sure you wish to commmit this ranking session? Ensure you have completed ranking all questions.  This action cannot be undone.';
-						ask.yesNo (q).then (function (r) {
-							if (r) {
-								$uibModalInstance.close({
-									action: 'commit',
-									questions: $scope.data.model.questions
-								});
-							}
-						});
-					};
-					$scope.truncate = function(string) {
-						if (string.length > 80)
-						   return string.substring(0,80)+'...';
-						else
-						   return string;
-					 };
-					$scope.inserted = function(item, index) {
-						// ensure item just dropped remains selected
-						$scope.data.model.selected = item;
-					};
-				}
-			}, {
-			})
-			.then (function (resp) {
-
-				// commit selected ordering to proposals
-				// this nastiness is necessary as the drag and drop widget deep clones objects, so we have to match up original
-				// question/response objects by id and update the originals
-				vm.proposals.forEach(function(proposal) {
-					proposal.questions.forEach(function(question) {
-						var match = resp.questions[question.question].find(function(response) {
-							return question._id === response._id;
-						});
-
-						if (match) {
-							question.rank = resp.questions[question.question].indexOf(match) + 1;
-						}
-					})
-				})
-
-				if (resp.action === 'save') {
-					vm.saveProposals ();
-					vm.opportunity.evaluationStage = vm.stages.questions_saved;
-				}
-				if (resp.action === 'commit') {
-					vm.proposals.forEach(function(proposal) {
-						vm.questionScore(proposal);
-					});
-					vm.totalAndSort();
-					vm.calculateRankings();
-					vm.saveProposals ();
-					vm.opportunity.evaluationStage = vm.stages.code_scores;
-					vm.saveOpportunity ();
-				}
-			});
-		};
-		// -------------------------------------------------------------------------
-		//
-		// Totals and sorts the proposals highest to lowest based on current score
-		//
-		// -------------------------------------------------------------------------
-		vm.totalAndSort = function() {
-			vm.proposals.forEach(function(proposal) {
-				proposal.scores.total = Math.round((proposal.scores.skill + proposal.scores.question + proposal.scores.codechallenge + proposal.scores.interview + proposal.scores.price) * 100) / 100;
-			});
-
-			vm.proposals.sort(function(a, b) {
-				return b.scores.total - a.scores.total;
-			});
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Calculates rankings so that top 4 companies can be screened in - assumes the proposal are already sorted by current score
-		//
-		// * Teams that tie in points are considered to be in the same position
-		// * The highest scoring team following a tie will be considered to be in the position relative to the other teams
-		// * (If two teams tie for 1st, the next team will be in 3rd)
-		//
-		// -------------------------------------------------------------------------
-		vm.calculateRankings = function () {
-			var currentRanking = 0;
-			var prevScore;
-			vm.proposals.forEach(function(proposal) {
-				currentRanking++;
-				proposal.ranking = (proposal.scores.total === prevScore) ? currentRanking -1 : currentRanking;
-				prevScore = proposal.scores.total;
-				proposal.ranking > 4 ? proposal.screenedIn = false : proposal.screenedIn = true;
-			})
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Code Challenge Modal
-		//
-		// -------------------------------------------------------------------------
-		vm.codeChallenge = function () {
-			modalService.showModal ({
-				size: 'sm',
-				templateUrl: '/modules/opportunities/client/views/swu-opportunity-modal-code-challenge.html',
-				controller: function ($scope, $uibModalInstance) {
-					$scope.data = {};
-					$scope.data.proposalScores = [];
-					vm.proposals.forEach(function(proposal) {
-						if (proposal.screenedIn) {
-							$scope.data.proposalScores.push({ businessName: proposal.businessName, score: null })
-						}
-					})
-					$scope.cancel = function () {
-						$uibModalInstance.close ({});
-					};
-					$scope.save = function () {
-						$uibModalInstance.close ({
-							action : 'save',
-							proposalScores  : $scope.data.proposalScores
-						});
-					};
-				}
-			}, {
-			})
-			.then (function (resp) {
-				if (resp.action === 'save') {
-					var scoreCount = 0;
-					var passCount = 0;
-					resp.proposalScores.forEach(function(score) {
-						var match = vm.proposals.find(function(proposal) {
-							return proposal.businessName === score.businessName;
-						});
-
-						if (match) {
-							if (score.score / 25 >= 0.8) {
-								match.passedCodeChallenge = true;
-								match.scores.codechallenge = Math.round((score.score / 25) * (vm.weights.codechallenge * vm.maxPoints));
-								passCount++;
-							}
-							else {
-								match.passedCodeChallenge = false;
-							}
-
-							scoreCount++;
-						}
-					});
-
-					// if we have scored all proposal for the code challenge stage, and at least 1 company passed, move on
-					if (scoreCount === vm.proposals.filter(function(proposal) { return proposal.screenedIn}).length) {
-						if (passCount > 0) {
-							vm.opportunity.evaluationStage = vm.stages.interview
-						}
-						else {
-							vm.opportunity.evaluationStage = vm.stages.all_fail;
-						}
-					}
-
-					// calculate rankings
-					vm.totalAndSort();
-					vm.saveProposals();
-					vm.saveOpportunity();
-				}
-			});
-		};
-		// -------------------------------------------------------------------------
-		//
-		// Company Info Modal
-		//
-		// -------------------------------------------------------------------------
-		vm.showCompanyInfo = function(proposal) {
-			modalService.showModal({
-				size: 'md',
-				templateUrl: '/modules/proposals/client/views/swu-proposal-view.html',
-				controller: function($scope, $uibModalInstance) {
-					$scope.data = {};
-					$scope.data.proposal = proposal;
-					$scope.close = function() {
-						$uibModalInstance.close({});
-					}
-				}
-			})
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Question vetting ranking helper function
-		//
-		// -------------------------------------------------------------------------
-		vm.recalculateRankings = function() {
-			vm.responses.forEach(function(responseArray) {
-				var rejectedResponses = responseArray.filter(function(response) {
-					return response.rejected;
-				});
-
-				rejectedResponses.forEach(function(rejResponse) {
-					responseArray.forEach(function(response) {
-						if (rejResponse === response) {
-							response.rank = 0;
-						}
-						else if (rejResponse.rank < response.rank) {
-							response.rank -= 1;
-						}
-					})
-				});
-			});
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Question vetting modal
-		//
-		// -------------------------------------------------------------------------
-		vm.openQuestionVetting = function() {
-			modalService.showModal({
-				size: 'md',
-				templateUrl: '/modules/opportunities/client/views/swu-opportunity-modal-question-vetting.html',
-				controller: function($scope, $uibModalInstance) {
-					$scope.data				   = {};
-					$scope.data.questions      = [];
-					$scope.data.proposals      = vm.proposals;
-					$scope.data.nproposals     = vm.proposals.length;
-					$scope.data.questions      = vm.opportunity.questions;
-					$scope.data.responses      = vm.responses;
-					$scope.data.totalQuestions = vm.opportunity.questions.length;
-					$scope.data.currentPage    = 1;
-
-					$scope.close = function () {
-						$uibModalInstance.close({});
-					};
-					$scope.ok = function () {
-						$uibModalInstance.close({
-							action: 'save'
-						});
-					};
-					$scope.commit = function () {
-						var q = 'Are you sure you wish to commmit your validation? Ensure you have reviewed all questions.  This action cannot be undone.';
-						ask.yesNo (q).then (function (r) {
-							if (r) {
-								$uibModalInstance.close({
-									action: 'commit'
-								});
-							}
-						});
-					};
-
-					$scope.getWordCount = function (response) {
-						return response.split(' ').length;
-					}
-				}
-			})
-			.then(function (resp) {
-				if (resp.action === 'save') {
-					// save validations on responses, but do not end vetting stage
-					vm.recalculateRankings();
-					vm.saveProposals();
-				}
-				else if (resp.action === 'commit') {
-					// save validations on responses, and end vetting stage
-					vm.recalculateRankings();
-					vm.opportunity.evaluationStage = vm.stages.questions;
-					vm.saveProposals();
-					vm.saveOpportunity();
-					buildQuestionPivot();
-				}
-			});
-		}
-		// -------------------------------------------------------------------------
-		//
-		// Interview Modal
-		//
-		// -------------------------------------------------------------------------
-		vm.interview = function () {
-			modalService.showModal ({
-				size: 'sm',
-				templateUrl: '/modules/opportunities/client/views/swu-opportunity-modal-interview.html',
-				controller: function ($scope, $uibModalInstance) {
-					$scope.data = {};
-					$scope.data.proposalScores = [];
-					vm.proposals.forEach(function(proposal) {
-						if (proposal.screenedIn && proposal.passedCodeChallenge) {
-							$scope.data.proposalScores.push({ businessName: proposal.businessName, score: null })
-						}
-					})
-					$scope.cancel = function () {
-						$uibModalInstance.close ({});
-					};
-					$scope.save = function () {
-						$uibModalInstance.close ({
-							action : 'save',
-							proposalScores  : $scope.data.proposalScores
-						});
-					};
-				}
-			}, {
-			})
-			.then (function (resp) {
-				if (resp.action === 'save') {
-
-					var scoreCount = 0;
-					resp.proposalScores.forEach(function(score) {
-						var match = vm.proposals.find(function(proposal) {
-							return proposal.businessName === score.businessName;
-						});
-						if (match) {
-							match.scores.interview = Math.round((score.score / 25)  * (vm.weights.interview * vm.maxPoints));
-							scoreCount++;
-						}
-					});
-
-					// if we have scored all proposal for the interview stage, calculate price scores
-					if (scoreCount === vm.proposals.filter(function(proposal) { return proposal.screenedIn && proposal.passedCodeChallenge; }).length) {
-						vm.calculatePriceScores();
-						vm.opportunity.evaluationStage++;
-					}
-					vm.totalAndSort();
-					vm.saveProposals();
-					vm.saveOpportunity();
-				}
-			});
-		};
-		// -------------------------------------------------------------------------
-		//
-		// save all the proposals (rankings etc)
-		//
-		// -------------------------------------------------------------------------
-		vm.saveProposal = function (proposal) {
-			if (!vm.canEdit) return;
-			// vm.calculateProposalScore (proposal);
-			return proposal.createOrUpdate ();
-		};
-		vm.saveProposals = function () {
-			if (!vm.canEdit) return;
-			Promise.all (vm.proposals.map (function (proposal) {
-				return vm.saveProposal (proposal);
-			}))
-			.then (function () {
-				buildQuestionPivot ();
-			});
-		};
-		vm.saveOpportunity = function () {
-			if (!vm.canEdit) return;
-			vm.opportunity.$update ();
-		};
-		//
-		// skills are scored when the proposal is saved
-		//
-		vm.skillScore = function (proposal) {
-			return proposal.scores.skill;
-		};
-		//
-		// just pass it back
-		//
-		vm.interviewScore = function (proposal) {
-			return proposal.scores.interview;
-		};
-		//
-		// since the ranking is from 1 - n we want to invert it and then add up and
-		// give a percent over best possible score
-		//
-		// n = number of proposals
-		// m = number of questions
-		// Q(r) = question ranking (will be from 1 to n with 1 being the best)
-		//
-		// score = sum ( (n+1)-Q(r) ) / (n * m) * 400
-		//
-		// Rejected questions are not considered in the scoring
-		vm.questionScore = function (proposal) {
-			var bestScore = vm.opportunity.questions.length * vm.proposals.length;
-			proposal.scores.question = Math.round(
-				proposal.questions
-				// filter out rejected questions
-				.filter(function (q) {
-					return !q.rejected;
-				})
-				.map (function (q) {
-					return vm.proposals.length + 1 - q.rank;
-				}).reduce (function (a, b) {
-					return a + b;
-				}) / bestScore * (vm.weights.question * vm.maxPoints) * 100) / 100;
-			return proposal.scores.question;
-		};
-
-		vm.priceScore = function (proposal) {
-			return proposal.scores.price;
-		};
-
-		vm.calculatePriceScores = function () {
-			var lowestBidder;
-			var passedProposals = vm.proposals.filter(function(proposal) {
-				return proposal.screenedIn && proposal.passedCodeChallenge;
-			})
-
-			passedProposals.forEach(function(proposal) {
-				proposal.cost = proposal.phases.inception.cost + proposal.phases.proto.cost + proposal.phases.implementation.cost;
-				if (lowestBidder === undefined || proposal.cost < lowestBidder.cost) {
-					lowestBidder = proposal;
-				}
-			})
-
-			passedProposals.forEach(function(proposal) {
-				proposal.scores.price = Math.round((lowestBidder.cost/proposal.cost) * (vm.weights.price * vm.maxPoints) * 100) / 100;
-			})
-		};
-
-		vm.assign = function (proposal) {
-			var q = 'Are you sure you want to assign this opportunity to this proponent?';
-			ask.yesNo (q).then (function (r) {
-				if (r) {
-					ProposalsService.assignswu (proposal).$promise
-					.then (
-						function (response) {
-							vm.proposal = response;
-							Notification.success({ message: '<i class="fa fa-3x fa-check-circle"></i> Company has been assigned'});
-							$state.go ('opportunities.viewswu',{opportunityId:vm.opportunity.code});
-							vm.opportunity.evaluationStage = vm.stages.assigned;
-							vm.opportunity.proposal = proposal;
-							vm.saveOpportunity ();
-							proposal.isAssigned = true;
-							vm.saveProposal (proposal);
-						},
-						function (error) {
-							 Notification.error ({ message: error.data.message, title: '<i class="glyphicon glyphicon-remove"></i> Proposal Assignment failed!' });
-						}
-					);
-				}
-			});
-		};
-		// -------------------------------------------------------------------------
-		//
 		// publish or un publish the opportunity
 		//
 		// -------------------------------------------------------------------------
@@ -861,42 +233,6 @@
 				}
 			});
 		};
-		// -------------------------------------------------------------------------
-		//
-		// subscribe to changes
-		//
-		// -------------------------------------------------------------------------
-		vm.subscribe = function (state) {
-			if (state) {
-				NotificationsService.subscribeNotification ({notificationId: notificationCode}).$promise
-				.then (function () {
-					vm.notifyMe = true;
-					Notification.success ({
-						message : '<i class="glyphicon glyphicon-ok"></i> You have been successfully subscribed!'
-					});
-				}).catch (function (res) {
-					Notification.error ({
-						message : res.data.message,
-						title   : '<i class=\'glyphicon glyphicon-remove\'></i> Subscription Error!'
-					});
-				});
-			}
-			else {
-				NotificationsService.unsubscribeNotification ({notificationId: notificationCode}).$promise
-				.then (function () {
-					vm.notifyMe = false;
-					Notification.success ({
-						message : '<i class="glyphicon glyphicon-ok"></i> You have been successfully un-subscribed!'
-					});
-				}).catch (function (res) {
-					Notification.error ({
-						message : res.data.message,
-						title   : '<i class=\'glyphicon glyphicon-remove\'></i> Un-Subsciption Error!'
-					});
-				});
-			}
-		};
-
 	})
 	// =========================================================================
 	//
@@ -944,7 +280,151 @@
 		vm.form                   = {};
 		vm.opportunity.skilllist  = vm.opportunity.skills ? vm.opportunity.skills.join (', ') : '';
 		vm.closing				  = 'CLOSED';
-		vm.closing = ((vm.opportunity.deadline - new Date()) > 0) ? 'OPEN' : 'CLOSED';
+		vm.closing 				  = ((vm.opportunity.deadline - new Date()) > 0) ? 'OPEN' : 'CLOSED';
+
+		// viewmodel items related to team questions
+		if (!vm.opportunity.teamQuestions) {
+			vm.opportunity.teamQuestions = [];
+		}
+		vm.teamQuestions		  	= vm.opportunity.teamQuestions;
+		vm.teamQuestions.forEach(function(teamQuestion) {
+			teamQuestion.cleanQuestion 	= $sce.trustAsHtml(teamQuestion.question);
+			teamQuestion.cleanGuideline = $sce.trustAsHtml(teamQuestion.guideline);
+			teamQuestion.newQuestion = false;
+		});
+		vm.editingTeamQuestion	  	= false;
+		vm.teamQuestionEditIndex  	= -1;
+		vm.currentTeamQuestionText	= '';
+		vm.currentGuidelineText		= '';
+		vm.currentQuestionWordLimit = 300;
+		vm.currentQuestionScore		= 5;
+
+		// Adding a new team question
+		// We a new one to the list and enter edit mode
+		vm.addNewTeamQuestion = function() {
+			vm.teamQuestions.push({
+				question: '',
+				guideline: '',
+				wordLimit: 300,
+				questionScore: 5,
+				newQuestion: true
+			});
+
+			vm.currentTeamQuestionText = '';
+			vm.currentGuidelineText = '';
+			vm.currentQuestionWordLimit = 300;
+			vm.currentQuestionScore = 5;
+			vm.teamQuestionEditIndex = vm.teamQuestions.length - 1;
+			vm.editingTeamQuestion = true;
+		}
+		// Cancel edit team question
+		vm.cancelEditTeamQuestion = function() {
+			if (vm.editingTeamQuestion) {
+
+				// if this was a brand new question, remove it
+				if (vm.teamQuestions[vm.teamQuestionEditIndex].newQuestion === true) {
+					vm.teamQuestions.splice(vm.teamQuestionEditIndex, 1);
+				}
+
+				// discard changes
+				vm.currentTeamQuestionText = '';
+				vm.currentGuidelineText = '';
+				vm.editingTeamQuestion = false;
+			}
+		}
+		// Enter edit mode for an existing team question
+		vm.editTeamQuestion = function(index) {
+			vm.teamQuestionEditIndex = index;
+			var currentTeamQuestion = vm.teamQuestions[vm.teamQuestionEditIndex];
+			vm.currentTeamQuestionText = currentTeamQuestion.question;
+			vm.currentGuidelineText = currentTeamQuestion.guideline;
+			vm.currentQuestionWordLimit = currentTeamQuestion.wordLimit;
+			vm.currentQuestionScore = currentTeamQuestion.questionScore;
+			vm.editingTeamQuestion = true;
+		}
+		// Save edit team question
+		vm.saveEditTeamQuestion = function() {
+			var curTeamQuestion = vm.teamQuestions[vm.teamQuestionEditIndex];
+			if (curTeamQuestion) {
+				curTeamQuestion.question = vm.currentTeamQuestionText;
+				curTeamQuestion.guideline = vm.currentGuidelineText;
+				curTeamQuestion.wordLimit = vm.currentQuestionWordLimit;
+				curTeamQuestion.questionScore = vm.currentQuestionScore;
+				curTeamQuestion.cleanQuestion = $sce.trustAsHtml(vm.currentTeamQuestionText);
+				curTeamQuestion.cleanGuideline = $sce.trustAsHtml(vm.currentGuidelineText);
+				curTeamQuestion.newQuestion = false;
+			}
+
+			vm.editingTeamQuestion = false;
+		}
+
+		// Delete team question with confirm modal
+		vm.deleteTeamQuestion = function(index) {
+			if (index >= 0 && index < vm.teamQuestions.length) {
+				var q = 'Are you sure you wish to delete this team question from the opportunity?';
+				ask.yesNo (q).then (function (r) {
+					if (r) {
+						vm.teamQuestions.splice(index, 1);
+					}
+				});
+			}
+		}
+
+		// viewmodel items related to addendum
+		if (!vm.opportunity.addenda) {
+			vm.opportunity.addenda = [];
+		}
+		vm.addenda 			  	  = vm.opportunity.addenda;
+		vm.addenda.forEach(function(addendum) {
+			addendum.cleanDesc = $sce.trustAsHtml(addendum.description);
+		})
+		vm.editingAddenda		  = false;
+		vm.addendaEditIndex		  = -1;
+		vm.currentAddendaText	  = '';
+
+		// Adding a new addendum
+		// We add a new one to the list and enter edit mode
+		vm.addNewAddendum = function() {
+			vm.addenda.push({
+				description: '',
+				createdBy: Authentication.user,
+				createdOn: Date.now()
+			});
+
+			vm.currentAddendaText = '';
+			vm.addendaEditIndex = vm.addenda.length - 1;
+			vm.editingAddenda = true;
+		}
+		// Cancel edit addendum
+		vm.cancelEditAddendum = function() {
+			if (vm.editingAddenda) {
+				vm.addenda.splice(vm.addendaEditIndex, 1);
+				vm.editingAddenda = false;
+			}
+		}
+		// Save the addendum being edited
+		vm.saveEditAddendum = function() {
+			var curAddenda = vm.addenda[vm.addendaEditIndex];
+			if (curAddenda) {
+				curAddenda.description = vm.currentAddendaText;
+				curAddenda.createdBy = Authentication.user;
+				curAddenda.createdOn = Date.now();
+				curAddenda.cleanDesc = $sce.trustAsHtml(vm.currentAddendaText);
+			}
+
+			vm.editingAddenda = false;
+		}
+		// Delete an addendum with confirm modal
+		vm.deleteAddenda = function(index) {
+			if (index >= 0 && index < vm.addenda.length) {
+				var q = 'Are you sure you wish to delete this addendum?';
+				ask.yesNo (q).then (function (r) {
+					if (r) {
+						vm.addenda.splice(index, 1);
+					}
+				});
+			}
+		}
 		//
 		// Every time we enter here until the opportunity has been published we will update the questions to the most current
 		//

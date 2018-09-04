@@ -14,8 +14,6 @@ var User          = mongoose.model ('User');
 var validator     = require ('validator');
 var orgController = require (path.resolve ('./modules/orgs/server/controllers/orgs.server.controller'));
 var claimMessages = require (path.resolve ('./modules/messages/server/controllers/messages.controller')).claimMessages;
-var Notifications = require (path.resolve ('./modules/notifications/server/controllers/notifications.server.controller'));
-
 
  // CC:  USERFIELDS
 var whitelistedFields = [
@@ -79,7 +77,7 @@ var updateOrgs = function (orglist) {
 exports.update = function (req, res) {
 	// Init Variables
 	var user = req.user;
-	console.log (user.orgsMember);
+	// console.log (user.orgsMember);
 	if (user) {
 		// Update whitelisted fields only
 		var isClaimMessages = (!user.email && req.body.email);
@@ -311,7 +309,7 @@ exports.me = function (req, res) {
 };
 
 exports.count = function (req, res) {
-	User.count ({}, function (err, cnt) {
+	User.countDocuments ({}, function (err, cnt) {
 		if (err) res.status(400).send(err);
 		else res.json ({count:cnt});
 	});
