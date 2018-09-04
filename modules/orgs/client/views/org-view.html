@@ -1,3 +1,4 @@
+<section>
 <div class="profile-header">
 	<div class="container">
 		<img src="/{{vm.org.orgImageURL}}" class="img-rounded profile-header-image">
@@ -85,9 +86,7 @@
 				<div class="profile-body-heading">Business Info</div>
 			</div>
 		</div>
-		<div class="inline-message">
-			<i class="fa fa-lg fa-lock"></i>&nbsp; Public users can't see your business info. We keep this so you don't have to enter it again when you submit proposals.
-		</div>
+		
 		<div class="row">
 			<div class="col-xs-12 col-sm-4">
 				<div class="list">
@@ -124,25 +123,95 @@
 		
 		<div class="row">
 			<div class="col-xs-12">
-				<div class="profile-body-heading">Members</div>
-			</div>
-		</div>
-		<div class="row">
-			<div class="col-xs-12">
-				<div class="inline-message">
-					<i class="fa fa-lg fa-lock"></i>&nbsp; Public users can't see who the members of your company are. Your members' capabilities determine your eligibility to apply on <strong>Sprint With Us</strong> opportunities.
+				<div class="profile-body-heading">Members
+					&nbsp;
+					<i class="fa fa-lock" uib-tooltip="Public users can't see who the members of your company are. Your members' capabilities determine your eligibility to apply on Sprint With Us opportunities."></i>
 				</div>
 			</div>
 		</div>
 		
+		<!-- Display this div if company has less than two members -->
+		<div class="alert alert-warning" ng-if="vm.org.members.length<2">
+			<i class="fa fa-exclamation-triangle"></i>&nbsp; You need at least two members to apply on <i>Sprint With Us</i> opportunities.
+		</div>
+		
 		<div class="row">
 			<div class="col-xs-12 col-sm-6">
-				<div class="alert alert-warning" ng-if="vm.org.members.length<2">
-					<i class="fa fa-lg fa-exclamation-triangle"></i>&nbsp; You need at least two members to apply on <strong>Sprint With Us</strong> opportunities.
-				</div>
 				<div class="list member-list">
 					<member ng-repeat="member in vm.org.members">
-						<avatar-display size="40" url="member.profileImageURL" text="member.displayName"></avatar-display>
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
+					</member>
+					<member ng-repeat="member in vm.org.members">
+						<avatar-display size="30" url="member.profileImageURL" text="member.displayName"></avatar-display>
 					</member>
 				</div>
 				<div class="button-spacer">
@@ -179,7 +248,7 @@
 			</div>
 		</div>
 		<div class="alert alert-warning" ng-if="!vm.org.isCapable">
-			<i class="fa fa-lg fa-exclamation-triangle"></i>&nbsp; To apply on <strong>Sprint With Us</strong> opportunities, your members must collectively possess all of these capabilities:
+			<i class="fa fa-exclamation-triangle"></i>&nbsp; To apply on <i>Sprint With Us</i> opportunities, your members must collectively possess all of these capabilities:
 		</div>
 		<div class="row">
 			<div class="col-xs-12">
@@ -201,7 +270,9 @@
 		</div>
 		<div class="row">
 			<div class="col-xs-12">
-				<div class="profile-body-heading">Preferred Technical Skills</div>
+				<div class="profile-body-heading">Preferred Technical Skills
+					&nbsp;<i class="fa fa-info-circle" uib-tooltip="Sprint With Us opportunities sometimes call for these skills."></i>
+				</div>
 			</div>
 		</div>
 		<div class="row">
@@ -234,18 +305,18 @@
 				<div class="profile-body-heading">Sprint With Us Terms</div>
 				<!-- This div should appear only if the terms have not been accepted -->
 				<div class="alert alert-warning" ng-if="!vm.org.isAcceptedTerms">
-					<i class="fa fa-lg fa-exclamation-triangle"></i>&nbsp; To apply on <strong>Sprint With Us</strong> opportunities, you need to accept these terms:
+					<i class="fa fa-exclamation-triangle"></i>&nbsp; To apply on <i>Sprint With Us</i> opportunities, you need to accept these terms:
 				</div>
 				<!-- This div should persist, before and after the user has accepted the Terms (so they can always download them here) -->
-				<div class="button-spacer download-link">
-					<a href="/api/proposals/download/terms/rfq1" target="_blank"><i class="fa fa-lg fa-download"></i>&nbsp; Sprint With Us Terms</a>
+				<div>
+					<a href="/api/proposals/download/terms/rfq1" target="_blank"><i class="fa fa-download"></i>&nbsp; Sprint With Us Terms</a>
 				</div>
 				<!-- This div should appear only if the terms have not been accepted -->
 				<label class="checkbox-inline checkbox-alone">
 					<input type="checkbox" ng-model="vm.org.isAcceptedTerms" ng-click="vm.save()"> I have read, fully understand, and agree to the Terms &amp; Conditions.
 				</label>
 				<!-- Make it so that button is disabled until user checks the input above --- then the button should be what saves the acceptance and triggers the "you accepted the terms..." box section above -->
-				<div class="button-spacer">
+				<div>
 					<!-- Disable button if checkbox isn't checked yet -->
 					<button class="btn btn-primary">Accept</button>
 				</div>
@@ -257,3 +328,4 @@
 		</div>
 	</div>
 </div>
+</section>
