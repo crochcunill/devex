@@ -1,3 +1,11 @@
+<div class="sub-nav">
+	<div class="container">
+		<div class="breadcrumb-nav">
+			<a href="/orgs" class="breadcrumb-nav"><i class="fa fa-chevron-left"></i> All Companies</a>
+		</div>
+	</div>
+</div>
+
 <div class="profile-header">
 	<div class="container">
 		<img src="/{{vm.org.orgImageURL}}" class="img-rounded profile-header-image">
@@ -224,7 +232,7 @@
 			<div class="hidden-xs col-sm-1"></div>
 			<div class="col-xs-12 col-sm-5">
 				<!-- This div should appear only if the user has sent one or more invitations -->
-				<div class="list invitations-list">
+				<div>
 					<div class="list-heading"><i class="fa fa-envelope"></i>&nbsp; Invitations sent</div>
 					<!-- This should be a list of all emails that have been sent an invitation, but have not accepted yet. Upon acceptance, the member appears in the list and the email should disappear from this list. -->
 					<invitee>invitee1@domain.com
