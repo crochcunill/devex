@@ -133,7 +133,7 @@
 			<div class="col-xs-12">
 				<div class="profile-body-heading">Members
 					&nbsp;
-					<i class="fa fa-lock" uib-tooltip="Public users can't see who the members of your company are. Your members' capabilities determine your eligibility to apply on Sprint With Us opportunities."></i>
+					<i class="fa fa-lock popover-trigger" uib-popover="Only administrators of your company profile can see who your members are." popover-placement="right"></i>
 				</div>
 			</div>
 		</div>
@@ -252,7 +252,11 @@
 		</div>
 		<div class="row">
 			<div class="col-xs-12">
-				<div class="profile-body-heading">Capabilities</div>
+				<div class="profile-body-heading">
+					Capabilities
+					&nbsp;
+					<i class="fa fa-info-circle popover-trigger" uib-popover="Your members' claimed capabilities determine your company's eligibility to apply on Sprint With Us opportunities. Here's what you have covered:" popover-placement="right"></i>
+				</div>
 			</div>
 		</div>
 		<div class="alert alert-warning" ng-if="!vm.org.isCapable">
@@ -279,7 +283,7 @@
 		<div class="row">
 			<div class="col-xs-12">
 				<div class="profile-body-heading">Preferred Technical Skills
-					&nbsp;<i class="fa fa-info-circle" uib-tooltip="Sprint With Us opportunities sometimes call for these skills."></i>
+					&nbsp;<i class="fa fa-info-circle popover-trigger" uib-popover="Sprint With Us opportunities sometimes call for these skills."  popover-placement="right"></i>
 				</div>
 			</div>
 		</div>
