@@ -142,7 +142,7 @@
 	// Controller the view of the proposal page
 	//
 	// =========================================================================
-	.controller ('ProposalEditController', ['uibButtonConfig', 'capabilities', 'editing', '$scope', '$sce', 'ask', 'Upload', '$state', 'proposal', 'opportunity', 'Authentication', 'ProposalsService', 'OpportunitiesService', 'UsersService', 'Notification', 'CapabilitiesMethods', 'org', 'TINYMCE_OPTIONS', function (uibButtonConfig, capabilities, editing, $scope, $sce, ask, Upload, $state, proposal, opportunity, Authentication, ProposalsService, OpportunitiesService, UsersService, Notification, CapabilitiesMethods, org, TINYMCE_OPTIONS) {
+	.controller ('ProposalEditController', ['uibButtonConfig', 'capabilities', 'editing', '$scope', '$sce', 'ask', 'Upload', '$state', 'proposal', 'opportunity', 'Authentication', 'ProposalsService', 'OpportunitiesService', 'UsersService', 'Notification', 'CapabilitiesCommon', 'org', 'TINYMCE_OPTIONS', function (uibButtonConfig, capabilities, editing, $scope, $sce, ask, Upload, $state, proposal, opportunity, Authentication, ProposalsService, OpportunitiesService, UsersService, Notification, CapabilitiesCommon, org, TINYMCE_OPTIONS) {
 
 		var ppp              = this;
 
@@ -167,8 +167,8 @@
 		//
 		// set up the structures for capabilities
 		//
-		CapabilitiesMethods.init (ppp, ppp.opportunity, capabilities);
-		CapabilitiesMethods.dump (ppp, ppp.opportunity, capabilities);
+		CapabilitiesCommon.init (ppp, ppp.opportunity, capabilities);
+		CapabilitiesCommon.dump (ppp, ppp.opportunity, capabilities);
 
 		ppp.totals = {};
 		ppp.tinymceOptions = TINYMCE_OPTIONS;
